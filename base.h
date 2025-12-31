@@ -1,6 +1,167 @@
 #ifndef _BASE_H
 #define _BASE_H
 
+#if !defined(ENABLE_ASSERT)
+#define ENABLE_ASSERT 0
+#endif
+// #if !defined(ENABLE_SANITIZER)
+// #define ENABLE_SANITIZER 0
+// #endif
+// #if !defined(ENABLE_MANUAL_PROFILE)
+// #define ENABLE_MANUAL_PROFILE 0
+// #endif
+// #if !defined(ENABLE_AUTO_PROFILE)
+// #define ENABLE_AUTO_PROFILE 0
+// #endif
+
+// #if defined(ENABLE_ANY_PROFILE)
+// #error user should not configure ENABLE_ANY_PROFILE
+// #endif
+
+// #if ENABLE_MANUAL_PROFILE || ENABLE_AUTO_PROFILE
+// #define ENABLE_ANY_PROFILE 1
+// #else
+// #define ENABLE_ANY_PROFILE 0
+// #endif
+
+#if defined(__clang__)
+#define COMPILER_CLANG 1
+
+#if defined(_WIN32)
+#define OS_WINDOWS 1
+#elif defined(__gnu_linux__)
+#define OS_LINUX 1
+#elif defined(__APPLE__) && defined(__MACH__)
+#define OS_MAC 1
+#else
+#error missing OS detection
+#endif
+
+#if defined(__amd64__)
+#define ARCH_X64 1
+#elif defined(__i386__)
+#define ARCH_X86 1
+#elif defined(__arm__)
+#define ARCH_ARM 1
+#elif defined(__aarch64__)
+#define ARCH_ARM64 1
+#else
+#error missing ARCH detection
+#endif
+
+#elif defined(_MSC_VER)
+#define COMPILER_CL 1
+
+#if defined(_WIN32)
+#define OS_WINDOWS 1
+#else
+#error missing OS detection
+#endif
+
+#if defined(_M_AMD64)
+#define ARCH_X64 1
+#elif defined(_M_I86)
+#define ARCH_X86 1
+#elif defined(_M_ARM)
+#define ARCH_ARM 1
+// TODO(allen): ARM64?
+#else
+#error missing ARCH detection
+#endif
+
+#elif defined(__GNUC__)
+#define COMPILER_GCC 1
+
+#if defined(_WIN32)
+#define OS_WINDOWS 1
+#elif defined(__gnu_linux__)
+#define OS_LINUX 1
+#elif defined(__APPLE__) && defined(__MACH__)
+#define OS_MAC 1
+#else
+#error missing OS detection
+#endif
+
+#if defined(__amd64__)
+#define ARCH_X64 1
+#elif defined(__i386__)
+#define ARCH_X86 1
+#elif defined(__arm__)
+#define ARCH_ARM 1
+#elif defined(__aarch64__)
+#define ARCH_ARM64 1
+#else
+#error missing ARCH detection
+#endif
+
+#else
+#error no context cracking for this compiler
+#endif
+
+#if !defined(COMPILER_CL)
+#define COMPILER_CL 0
+#endif
+#if !defined(COMPILER_CLANG)
+#define COMPILER_CLANG 0
+#endif
+#if !defined(COMPILER_GCC)
+#define COMPILER_GCC 0
+#endif
+#if !defined(OS_WINDOWS)
+#define OS_WINDOWS 0
+#endif
+#if !defined(OS_LINUX)
+#define OS_LINUX 0
+#endif
+#if !defined(OS_MAC)
+#define OS_MAC 0
+#endif
+#if !defined(ARCH_X64)
+#define ARCH_X64 0
+#endif
+#if !defined(ARCH_X86)
+#define ARCH_X86 0
+#endif
+#if !defined(ARCH_ARM)
+#define ARCH_ARM 0
+#endif
+#if !defined(ARCH_ARM64)
+#define ARCH_ARM64 0
+#endif
+
+#if defined(__cplusplus)
+#define LANG_CXX 1
+#else
+#define LANG_C 1
+#endif
+
+#if !defined(LANG_CXX)
+#define LANG_CXX 0
+#endif
+#if !defined(LANG_C)
+#define LANG_C 0
+#endif
+
+// #if !defined(PROFILER_SPALL)
+// #define PROFILER_SPALL 0
+// #endif
+
+// #if OS_WINDOWS
+// #if COMPILER_CL || COMPILER_CLANG
+// #define INTRINSICS_MICROSOFT 1
+// #endif
+// #endif
+
+// #if !defined(INTRINSICS_MICROSOFT)
+// #define INTRINSICS_MICROSOFT 0
+// #endif
+
+#if ARCH_X64 || ARCH_ARM64
+#define ARCH_ADDRSIZE 64
+#else
+#define ARCH_ADDRSIZE 32
+#endif
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -10,12 +171,12 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 typedef size_t usize;
-typedef ssize_t isize;
 
 typedef int8_t i8;
 typedef int16_t i16;
 typedef int32_t i32;
 typedef int64_t i64;
+typedef ssize_t isize;
 
 typedef float f32;
 typedef double f64;
@@ -33,9 +194,13 @@ typedef double f64;
 
 #define ARRAY_COUNT(x) (sizeof(x) / sizeof(*(x)))
 
-// #define ASSERT_BREAK() (*(int *) 0 = 0)
+#if COMPILER_GCC || COMPILER_CLANG
 #define ASSERT_BREAK() __builtin_trap()
-#ifdef BASE_ENABLE_ASSERT
+#else
+#define ASSERT_BREAK() (*(int *) 0 = 0)
+#endif
+
+#if ENABLE_ASSERT
 #define ASSERT(x)                                                                       \
     if (!(x))                                                                           \
     {                                                                                   \
@@ -141,7 +306,11 @@ DECLARE_VECTOR4(v4f32, f32)
 
 DECLARE_RESULT(u32r, u32, Unit)
 
-#ifdef BASE_ENABLE_GL
+#if !defined(ENABLE_OPENGL)
+#define ENABLE_OPENGL 0
+#endif
+
+#if ENABLE_OPENGL
 
 #define GL_CLEAR_ERRORS() STATEMENT(while (GL_FALSE != glGetError());)
 
@@ -162,7 +331,7 @@ static bool glLogCall(char const *function_name, char const *file_name, int line
 #define GL_CALL(x) STATEMENT(x;)
 #endif
 
-#endif // BASE_ENABLE_GL
+#endif // ENABLE_OPENGL
 
 /// Returns a view into the buffer containing the path.
 ///
@@ -173,37 +342,5 @@ static bool glLogCall(char const *function_name, char const *file_name, int line
 ///
 /// On error: Returns an empty slice pointing to null with count = 0.
 chars getAppDir(chars buffer);
-
-#ifdef BASE_IMPLEMENTATION
-
-#include <mach-o/dyld.h>
-
-// MAXPATHLEN is defined here. We can maybe use it somehow.
-// #include <sys/param.h>
-
-chars getAppDir(chars buffer)
-{
-    usize path_count = buffer.count;
-    i32 read_count = 0;
-
-    // From
-    // https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/dyld.3.html:
-    //
-    // Note that _NSGetExecutablePath() will return "a path" to
-    // the executable not a "real path" to the executable.  That is, the path
-    // may be a symbolic link and not the real file. With deep directories the
-    // total bufsize needed could be more than MAXPATHLEN.
-    if (0 != _NSGetExecutablePath(buffer.ptr, (u32 *) &path_count))
-    {
-        return (chars) {.ptr = NULL, .count = 0};
-    }
-
-    return (chars) {
-        .ptr = buffer.ptr,
-        .count = (usize) path_count,
-    };
-}
-
-#endif // BASE_IMPLEMENTATION
 
 #endif // _BASE_H
